@@ -49,19 +49,22 @@ async function createDefaultAdmin() {
     if (!adminExists) {
       console.log('Usuário administrador padrão não encontrado. Criando...');
       const hashedPassword = await hashPassword('admin123');
-      await AdminUser.create({
+      const newAdmin = await AdminUser.create({
         login: 'admin',
         password: hashedPassword,
         name: 'Administrador Padrão',
         email: 'admin@admin.com',
         isActive: true,
       });
-      console.log('Usuário administrador padrão criado com sucesso!');
+      console.log('Usuário administrador padrão criado com sucesso:', newAdmin.toJSON());
+    } else {
+      console.log('Usuário administrador padrão já existe:', adminExists.toJSON());
     }
   } catch (error) {
     console.error('Falha ao tentar criar o usuário administrador padrão:', error);
   }
 }
+
 
 // Conectar ao banco de dados e iniciar o servidor
 async function startServer() {
