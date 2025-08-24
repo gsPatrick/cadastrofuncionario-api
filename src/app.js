@@ -12,12 +12,22 @@ const { AppError, globalErrorHandler } = require('./utils/errorHandler');
 const { AdminUser } = require('./models');
 const { hashPassword } = require('./utils/auth');
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
-app.use(cors());
-app.use(bodyParser.json());
+const app = express();
+
+app.use(cors({
+  origin: [
+    "https://n8n-cadastrofuncionario-front.r954jc.easypanel.host" // seu front
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
+app.use(express.json());
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
