@@ -1,7 +1,7 @@
+// features/annotation/annotation.routes.js
 const express = require('express');
 const AnnotationController = require('./annotation.controller');
 
-// { mergeParams: true } permite que este router acesse parâmetros da rota pai
 const router = express.Router({ mergeParams: true });
 
 router.route('/')
