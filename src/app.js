@@ -18,9 +18,7 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 
 app.use(cors({
-  origin: [
-    "https://n8n-cadastrofuncionario-front.r954jc.easypanel.host" // seu front
-  ],
+  origin: '*', // permite qualquer origem
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
