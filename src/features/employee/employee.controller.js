@@ -1,3 +1,5 @@
+// features/employee/employee.controller.js
+
 const EmployeeService = require('./employee.service');
 const { AppError } = require('../../utils/errorHandler');
 const { stringify } = require('csv-stringify');
@@ -5,7 +7,6 @@ const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
 class EmployeeController {
-  // Métodos create, getAll, getById, update, delete (sem alterações da resposta anterior)
   static async createEmployee(req, res, next) {
     try {
       const newEmployee = await EmployeeService.createEmployee(req.body);
@@ -34,7 +35,9 @@ class EmployeeController {
 
   static async updateEmployee(req, res, next) {
     try {
-      const updatedEmployee = await EmployeeService.updateEmployee(req.params.id, req.body);
+      // Pega o ID do admin logado a partir do token (req.user.id)
+      const adminUserId = req.user.id; 
+      const updatedEmployee = await EmployeeService.updateEmployee(req.params.id, req.body, adminUserId);
       res.status(200).json({ status: 'success', data: { employee: updatedEmployee } });
     } catch (error) {
       if (error.name === 'SequelizeUniqueConstraintError' || error.statusCode === 409) return next(new AppError(error.message, 409));
@@ -49,10 +52,21 @@ class EmployeeController {
       res.status(204).json({ status: 'success', data: null });
     } catch (error) { next(error); }
   }
+  
+  // --- NOVO MÉTODO PARA HISTÓRICO ---
+  static async getEmployeeHistory(req, res, next) {
+    try {
+      const history = await EmployeeService.getEmployeeHistoryById(req.params.id);
+      res.status(200).json({
+        status: 'success',
+        results: history.length,
+        data: { history },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-  /**
-   * Exporta os dados dos funcionários para CSV.
-   */
   static async exportToCsv(req, res, next) {
     try {
       const { search, ...filters } = req.query;
@@ -69,9 +83,6 @@ class EmployeeController {
     } catch (error) { next(error); }
   }
 
-  /**
-   * Exporta os dados dos funcionários para PDF.
-   */
   static async exportToPdf(req, res, next) {
     try {
       const { search, ...filters } = req.query;
@@ -84,27 +95,22 @@ class EmployeeController {
       res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.pdf`);
       doc.pipe(res);
 
-      // Cabeçalho do documento
       doc.fontSize(18).text('Relatório de Funcionários', { align: 'center' });
       doc.moveDown();
 
-      // Conteúdo
       data.forEach(employee => {
         doc.fontSize(12).text(`ID: ${employee.ID}`, { continued: true }).text(` - Matrícula: ${employee.Matrícula}`);
         doc.fontSize(14).text(employee['Nome Completo'], { underline: true });
         doc.fontSize(10).text(`Cargo: ${employee.Cargo} - Departamento: ${employee.Departamento}`);
         doc.text(`Email: ${employee['Email Institucional']} - CPF: ${employee.CPF}`);
         doc.text(`Status: ${employee['Status Funcional']}`);
-        doc.moveDown(1.5); // Espaço entre os registros
+        doc.moveDown(1.5);
       });
 
       doc.end();
     } catch (error) { next(error); }
   }
 
-  /**
-   * Exporta os dados dos funcionários para Excel (XLSX).
-   */
   static async exportToExcel(req, res, next) {
     try {
       const { search, ...filters } = req.query;
@@ -114,14 +120,12 @@ class EmployeeController {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Funcionários');
 
-      // Define as colunas
       worksheet.columns = Object.keys(data[0]).map(key => ({
         header: key,
         key: key,
-        width: Math.max(key.length, 20) // Largura mínima
+        width: Math.max(key.length, 20)
       }));
 
-      // Adiciona as linhas de dados
       worksheet.addRows(data);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

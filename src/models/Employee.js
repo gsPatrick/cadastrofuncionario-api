@@ -1,3 +1,45 @@
+// models/Employee.js
+
+// Mapeamento de nomes de campos para nomes amigáveis para o histórico
+const fieldDisplayNames = {
+  fullName: 'Nome Completo',
+  registrationNumber: 'Matrícula',
+  institutionalLink: 'Vínculo Institucional',
+  position: 'Cargo',
+  role: 'Função',
+  department: 'Departamento',
+  currentAssignment: 'Lotação Atual',
+  admissionDate: 'Data de Admissão',
+  educationLevel: 'Nível de Formação',
+  educationArea: 'Área de Formação',
+  dateOfBirth: 'Data de Nascimento',
+  gender: 'Gênero',
+  maritalStatus: 'Estado Civil',
+  hasChildren: 'Possui Filhos',
+  numberOfChildren: 'Número de Filhos',
+  cpf: 'CPF',
+  rg: 'RG',
+  rgIssuer: 'Órgão Emissor (RG)',
+  addressStreet: 'Logradouro',
+  addressNumber: 'Número (Endereço)',
+  addressComplement: 'Complemento',
+  addressNeighborhood: 'Bairro',
+  addressCity: 'Cidade',
+  addressState: 'Estado (UF)',
+  addressZipCode: 'CEP',
+  emergencyContactPhone: 'Telefone de Emergência',
+  mobilePhone1: 'Celular 1',
+  mobilePhone2: 'Celular 2',
+  institutionalEmail: 'E-mail Institucional',
+  personalEmail: 'E-mail Pessoal',
+  functionalStatus: 'Situação Funcional',
+  generalObservations: 'Observações Gerais',
+  comorbidity: 'Comorbidade',
+  disability: 'Deficiência',
+  bloodType: 'Tipo Sanguíneo',
+};
+
+
 module.exports = (sequelize, DataTypes) => {
   const Employee = sequelize.define('Employee', {
     id: {
@@ -29,21 +71,21 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: { notEmpty: true }
     },
-    position: { // Cargo
+    position: {
       type: DataTypes.STRING,
       allowNull: false,
       validate: { notEmpty: true }
     },
-    role: { // Função
+    role: {
       type: DataTypes.STRING,
-      allowNull: true, // Pode ser nulo se não houver distinção entre Cargo e Função
+      allowNull: true,
     },
-    department: { // Setor/Departamento
+    department: {
       type: DataTypes.STRING,
       allowNull: false,
       validate: { notEmpty: true }
     },
-    currentAssignment: { // Lotação atual
+    currentAssignment: {
       type: DataTypes.STRING,
       allowNull: true,
     },
@@ -51,11 +93,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: false,
     },
-    educationLevel: { // Nível de formação
+    // Campos de formação já existentes
+    educationLevel: {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    educationArea: { // Área de formação e titulação
+    educationArea: {
       type: DataTypes.STRING,
       allowNull: true,
     },
@@ -63,26 +106,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: false,
     },
-    gender: { // Sexo
+    gender: {
       type: DataTypes.ENUM('Masculino', 'Feminino', 'Outro', 'Não Informado'),
       allowNull: false,
     },
-    maritalStatus: { // Estado civil
+    maritalStatus: {
       type: DataTypes.ENUM('Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável'),
       allowNull: false,
     },
-    hasChildren: { // Possui filhos?
+    hasChildren: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
     },
-    numberOfChildren: { // Quantos filhos?
+    numberOfChildren: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Nullable se hasChildren for false
+      allowNull: true,
       validate: { min: 0 }
     },
     cpf: {
-      type: DataTypes.STRING(11), // CPF tem 11 dígitos
+      type: DataTypes.STRING(11),
       allowNull: false,
       unique: true,
       validate: { notEmpty: true, len: [11, 11] }
@@ -93,35 +136,35 @@ module.exports = (sequelize, DataTypes) => {
       unique: true,
       validate: { notEmpty: true }
     },
-    rgIssuer: { // Órgão expedidor (RG)
+    rgIssuer: {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    addressStreet: { // Logradouro
+    addressStreet: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    addressNumber: { // Número
+    addressNumber: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    addressComplement: { // Complemento
+    addressComplement: {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    addressNeighborhood: { // Bairro
+    addressNeighborhood: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    addressCity: { // Cidade
+    addressCity: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    addressState: { // Estado (UF)
+    addressState: {
       type: DataTypes.STRING(2),
       allowNull: false,
     },
-    addressZipCode: { // CEP
+    addressZipCode: {
       type: DataTypes.STRING(8),
       allowNull: false,
       validate: { len: [8, 8] }
@@ -130,11 +173,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    mobilePhone1: { // Telefone celular 1
+    mobilePhone1: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    mobilePhone2: { // Telefone celular 2
+    mobilePhone2: {
       type: DataTypes.STRING,
       allowNull: true,
     },
@@ -149,23 +192,79 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       validate: { isEmail: true }
     },
-    functionalStatus: { // Situação funcional
-      type: DataTypes.ENUM('Ativo', 'Afastado', 'Licença', 'Desligado', 'Férias'), // Adicione outros conforme necessário
+    functionalStatus: {
+      type: DataTypes.ENUM('Ativo', 'Afastado', 'Licença', 'Desligado', 'Férias'),
       allowNull: false,
       defaultValue: 'Ativo',
     },
-    generalObservations: { // Observações gerais
+    generalObservations: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    // --- NOVOS CAMPOS ---
+    comorbidity: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Comorbidades do funcionário.',
+    },
+    disability: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Tipo de deficiência, se houver.',
+    },
+    bloodType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Tipo sanguíneo do funcionário (ex: A+, O-).',
     },
   }, {
     tableName: 'employees',
     timestamps: true,
+    hooks: {
+      afterUpdate: async (instance, options) => {
+        const { EmployeeHistory } = instance.sequelize.models;
+        const changedById = options.adminUserId; // Pega o ID do admin passado pelas opções
+
+        if (!changedById) {
+          console.warn(`Tentativa de atualizar o funcionário ${instance.id} sem um adminUserId.`);
+          return;
+        }
+
+        const changes = instance.changed();
+        if (changes) {
+          const historyRecords = [];
+          for (const field of changes) {
+            // Ignora campos que não queremos rastrear
+            if (field === 'updatedAt') continue;
+
+            const oldValue = instance.previous(field);
+            const newValue = instance.get(field);
+            
+            // Só registra se o valor realmente mudou
+            if (oldValue !== newValue) {
+              historyRecords.push({
+                employeeId: instance.id,
+                fieldName: fieldDisplayNames[field] || field, // Usa o nome amigável ou o nome técnico
+                oldValue: String(oldValue),
+                newValue: String(newValue),
+                changedById: changedById,
+              });
+            }
+          }
+
+          if (historyRecords.length > 0) {
+            await EmployeeHistory.bulkCreate(historyRecords, { transaction: options.transaction });
+          }
+        }
+      }
+    }
   });
 
   Employee.associate = (models) => {
     Employee.hasMany(models.Document, { foreignKey: 'employeeId', as: 'documents' });
     Employee.hasMany(models.Annotation, { foreignKey: 'employeeId', as: 'annotations' });
+    // Adiciona a associação com o histórico
+    Employee.hasMany(models.EmployeeHistory, { foreignKey: 'employeeId', as: 'history' });
   };
 
   return Employee;

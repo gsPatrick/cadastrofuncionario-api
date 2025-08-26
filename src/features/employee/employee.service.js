@@ -1,4 +1,6 @@
-const { Employee, Document, Annotation } = require('../../models');
+// features/employee/employee.service.js
+
+const { Employee, Document, Annotation, EmployeeHistory, AdminUser } = require('../../models');
 const { AppError } = require('../../utils/errorHandler');
 const { enforceCase } = require('../../utils/textFormatter');
 const { Op } = require('sequelize');
@@ -39,7 +41,15 @@ class EmployeeService {
       if (existingEmployee.institutionalEmail === formattedData.institutionalEmail) throw new AppError('Email institucional já cadastrado.', 409);
     }
 
-    return Employee.create(formattedData);
+    // Inclui os novos campos que podem vir do formulário
+    return Employee.create({
+      ...formattedData,
+      educationLevel: employeeData.educationLevel,
+      educationArea: employeeData.educationArea,
+      comorbidity: employeeData.comorbidity,
+      disability: employeeData.disability,
+      bloodType: employeeData.bloodType,
+    });
   }
 
   /**
@@ -94,12 +104,12 @@ class EmployeeService {
       include: [
         {
           model: Document,
-          as: 'documents', // 'as' deve corresponder ao definido na associação em Employee.js
+          as: 'documents',
           attributes: ['id', 'documentType', 'description', 'filePath', 'uploadedAt']
         },
         {
           model: Annotation,
-          as: 'annotations', // 'as' deve corresponder ao definido na associação em Employee.js
+          as: 'annotations',
           attributes: ['id', 'title', 'content', 'category', 'annotationDate', 'updatedAt']
         }
       ],
@@ -119,14 +129,15 @@ class EmployeeService {
    * Atualiza os dados de um funcionário.
    * @param {number} id - O ID do funcionário a ser atualizado.
    * @param {object} updateData - Os dados a serem atualizados.
+   * @param {number} adminUserId - O ID do admin que está realizando a alteração.
    * @returns {Promise<Employee>} O funcionário atualizado.
    */
-  static async updateEmployee(id, updateData) {
+  static async updateEmployee(id, updateData, adminUserId) {
     const employee = await Employee.findByPk(id);
     if (!employee) {
       throw new AppError('Funcionário não encontrado.', 404);
     }
-
+    
     const formattedUpdateData = {};
     for (const key in updateData) {
       if (typeof updateData[key] === 'string') {
@@ -139,7 +150,7 @@ class EmployeeService {
         formattedUpdateData[key] = updateData[key];
       }
     }
-
+    
     const uniqueFields = ['registrationNumber', 'cpf', 'institutionalEmail'];
     for (const field of uniqueFields) {
       if (formattedUpdateData[field] && formattedUpdateData[field] !== employee[field]) {
@@ -149,8 +160,9 @@ class EmployeeService {
         }
       }
     }
-
-    await employee.update(formattedUpdateData);
+    
+    // Passa o adminUserId nas opções para o hook `afterUpdate`
+    await employee.update(formattedUpdateData, { adminUserId });
     return employee;
   }
 
@@ -173,7 +185,7 @@ class EmployeeService {
    * @returns {Promise<object[]>} Array de dados dos funcionários.
    */
   static async getEmployeesForExport({ search, filters }) {
-    const { employees } = await this.getAllEmployees({ search, filters, page: 1, limit: 10000 }); // Limite alto para pegar todos
+    const { employees } = await this.getAllEmployees({ search, filters, page: 1, limit: 10000 });
 
     return employees.map(emp => ({
       ID: emp.id,
@@ -189,6 +201,30 @@ class EmployeeService {
       'Email Institucional': emp.institutionalEmail,
       'Status Funcional': emp.functionalStatus,
     }));
+  }
+
+  /**
+   * Obtém o histórico de alterações de um funcionário.
+   * @param {number} employeeId - O ID do funcionário.
+   * @returns {Promise<EmployeeHistory[]>} O histórico de alterações.
+   */
+  static async getEmployeeHistoryById(employeeId) {
+    const employee = await Employee.findByPk(employeeId);
+    if (!employee) {
+      throw new AppError('Funcionário não encontrado.', 404);
+    }
+
+    return EmployeeHistory.findAll({
+      where: { employeeId },
+      order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: AdminUser,
+          as: 'changedBy',
+          attributes: ['name', 'login'], // Pega o nome e login de quem alterou
+        },
+      ],
+    });
   }
 }
 
