@@ -1,3 +1,5 @@
+// features/employee/employee.validator.js - VERSÃO CORRIGIDA
+
 const { body } = require('express-validator');
 
 // Regras de validação para a criação de um novo funcionário.
@@ -33,9 +35,12 @@ exports.validateEmployeeCreation = [
   body('maritalStatus')
     .notEmpty().withMessage('Estado civil é obrigatório.')
     .isIn(['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']).withMessage('Estado civil inválido.'),
+  
+  // --- ALTERAÇÃO APLICADA AQUI ---
   body('hasChildren')
-    .notEmpty().withMessage('Informação sobre filhos é obrigatória.')
-    .isBoolean().withMessage('O campo "possui filhos" deve ser verdadeiro ou falso.'),
+    .isBoolean().withMessage('O campo "possui filhos" deve ser um valor booleano (true ou false).'),
+    // A verificação .notEmpty() foi removida.
+
   body('numberOfChildren')
     .optional({ nullable: true })
     .isInt({ min: 0 }).withMessage('Número de filhos deve ser um número inteiro igual ou maior que zero.'),
@@ -62,7 +67,7 @@ exports.validateEmployeeCreation = [
     .isEmail().withMessage('Email institucional inválido.')
     .normalizeEmail(),
   body('personalEmail')
-    .optional({ checkFalsy: true }) // Permite que o campo seja nulo ou uma string vazia
+    .optional({ checkFalsy: true })
     .isEmail().withMessage('Email pessoal inválido.')
     .normalizeEmail(),
   body('functionalStatus')
