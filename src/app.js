@@ -6,7 +6,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const cors = require('cors');
-const allRoutes = require('./routes'); // Esta linha carrega o index.js das rotas
+const path = require('path'); // <-- 1. IMPORTAR O MÓDULO 'path' DO NODE.JS
+const allRoutes = require('./routes');
 const { sequelize } = require('./models');
 const { AppError, globalErrorHandler } = require('./utils/errorHandler');
 const { AdminUser } = require('./models');
@@ -18,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 
 app.use(cors({
-  origin: '*', // permite qualquer origem
+  origin: '*',
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -28,6 +29,10 @@ app.use(express.json());
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+
+// <-- 2. ADICIONAR O MIDDLEWARE PARA SERVIR ARQUIVOS ESTÁTICOS -->
+// Torna a pasta 'uploads' publicamente acessível através da rota '/uploads'
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rotas
 app.use('/api', allRoutes);
@@ -70,7 +75,9 @@ async function startServer() {
     await sequelize.authenticate();
     console.log('Conexão com o banco de dados estabelecida com sucesso.');
 
-    await sequelize.sync({ force: true });
+    // ATENÇÃO: sequelize.sync({ force: true }) apaga o banco a cada reinício.
+    // Para produção, use { alter: true } ou migrations.
+    await sequelize.sync({ alter: true }); 
     console.log('Modelos sincronizados com o banco de dados.');
 
     await createDefaultAdmin();
