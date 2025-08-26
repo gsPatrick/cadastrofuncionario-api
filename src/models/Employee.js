@@ -1,4 +1,4 @@
-// models/Employee.js
+// models/Employee.js - VERSÃO FINAL CORRIGIDA
 
 // Mapeamento de nomes de campos para nomes amigáveis para o histórico
 const fieldDisplayNames = {
@@ -93,7 +93,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: false,
     },
-    // Campos de formação já existentes
     educationLevel: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -185,12 +184,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      validate: { isEmail: true }
+      // O bloco "validate" foi removido daqui
     },
     personalEmail: {
       type: DataTypes.STRING,
       allowNull: true,
-      validate: { isEmail: true }
+      // O bloco "validate" foi removido daqui
     },
     functionalStatus: {
       type: DataTypes.ENUM('Ativo', 'Afastado', 'Licença', 'Desligado', 'Férias'),
@@ -201,7 +200,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    // --- NOVOS CAMPOS ---
     comorbidity: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -223,7 +221,7 @@ module.exports = (sequelize, DataTypes) => {
     hooks: {
       afterUpdate: async (instance, options) => {
         const { EmployeeHistory } = instance.sequelize.models;
-        const changedById = options.adminUserId; // Pega o ID do admin passado pelas opções
+        const changedById = options.adminUserId;
 
         if (!changedById) {
           console.warn(`Tentativa de atualizar o funcionário ${instance.id} sem um adminUserId.`);
@@ -234,17 +232,15 @@ module.exports = (sequelize, DataTypes) => {
         if (changes) {
           const historyRecords = [];
           for (const field of changes) {
-            // Ignora campos que não queremos rastrear
             if (field === 'updatedAt') continue;
 
             const oldValue = instance.previous(field);
             const newValue = instance.get(field);
             
-            // Só registra se o valor realmente mudou
             if (oldValue !== newValue) {
               historyRecords.push({
                 employeeId: instance.id,
-                fieldName: fieldDisplayNames[field] || field, // Usa o nome amigável ou o nome técnico
+                fieldName: fieldDisplayNames[field] || field,
                 oldValue: String(oldValue),
                 newValue: String(newValue),
                 changedById: changedById,
@@ -263,7 +259,6 @@ module.exports = (sequelize, DataTypes) => {
   Employee.associate = (models) => {
     Employee.hasMany(models.Document, { foreignKey: 'employeeId', as: 'documents' });
     Employee.hasMany(models.Annotation, { foreignKey: 'employeeId', as: 'annotations' });
-    // Adiciona a associação com o histórico
     Employee.hasMany(models.EmployeeHistory, { foreignKey: 'employeeId', as: 'history' });
   };
 
