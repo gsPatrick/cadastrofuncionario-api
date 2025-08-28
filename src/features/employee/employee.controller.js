@@ -100,13 +100,25 @@ class EmployeeController {
 
       const headers = Object.keys(data[0]);
       const rows = data.map(Object.values);
+
+      const columnRatios = {
+        'ID': 0.5, 'Nome Completo': 2.5, 'Matrícula': 1, 'Vínculo Institucional': 1.5,
+        'Cargo': 1.5, 'Função': 1.5, 'Departamento': 1.5, 'Lotação Atual': 1.5,
+        'Data de Admissão': 1, 'Nível de Formação': 1.5, 'Área de Formação': 1.5,
+        'Data de Nascimento': 1, 'Gênero': 0.8, 'Estado Civil': 1, 'Possui Filhos': 0.8,
+        'Número de Filhos': 0.8, 'CPF': 1.2, 'RG': 1, 'Órgão Emissor (RG)': 1,
+        'Logradouro': 2.5, 'Número (Endereço)': 0.8, 'Complemento': 1, 'Bairro': 1.5,
+        'Cidade': 1.5, 'Estado (UF)': 0.5, 'CEP': 1, 'Telefone de Emergência': 1.5,
+        'Celular 1': 1.5, 'Celular 2': 1.5, 'E-mail Institucional': 2.5, 'E-mail Pessoal': 2.5,
+        'Situação Funcional': 1, 'Observações Gerais': 3, 'Comorbidade': 1.5, 'Deficiência': 1.5,
+        'Tipo Sanguíneo': 1
+      };
       
-      // Definição de pesos proporcionais para cada coluna
-      const columnRatios = [ 0.5, 2.5, 1, 1.5, 1, 1, 1.5, 1.5, 1, 1.5, 1.5, 1, 1, 1, 0.8, 1, 1.5, 1, 1, 2, 1, 1.5, 1.5, 1.5, 0.5, 1, 1.5, 1.5, 1.5, 2.5, 2.5, 1, 3, 1.5, 1.5, 1.5 ];
-      const totalRatio = columnRatios.reduce((sum, ratio) => sum + ratio, 0);
+      const orderedRatios = headers.map(header => columnRatios[header] || 1);
+      const totalRatio = orderedRatios.reduce((sum, ratio) => sum + ratio, 0);
       const availableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
       
-      const columnWidths = columnRatios.map(ratio => (ratio / totalRatio) * availableWidth);
+      const columnWidths = orderedRatios.map(ratio => (ratio / totalRatio) * availableWidth);
 
       const table = { headers, rows, columnWidths };
 
@@ -116,21 +128,28 @@ class EmployeeController {
         const rowSpacing = 5;
 
         const drawHeader = () => {
-          doc.fontSize(5).font('Helvetica-Bold');
+          doc.fontSize(7).font('Helvetica-Bold');
           let x = startX;
+
+          let maxHeaderHeight = 0;
           table.headers.forEach((header, i) => {
-            doc.text(header.replace(/ /g, '\n'), x, y, { width: table.columnWidths[i], align: 'center' });
+            const height = doc.heightOfString(header, { width: table.columnWidths[i] });
+            if (height > maxHeaderHeight) {
+              maxHeaderHeight = height;
+            }
+          });
+          
+          table.headers.forEach((header, i) => {
+            doc.text(header, x, y, { width: table.columnWidths[i], align: 'left' });
             x += table.columnWidths[i];
           });
-          const headerHeight = doc.heightOfString(table.headers[1], {width: table.columnWidths[1]}) + rowSpacing; // Usa uma coluna de referência
-          y += headerHeight;
+
+          y += maxHeaderHeight + rowSpacing;
           doc.moveTo(startX, y).lineTo(availableWidth + startX, y).stroke();
           y += rowSpacing;
         };
 
         const drawRow = (row) => {
-          doc.fontSize(6).font('Helvetica');
-          
           let maxHeight = 0;
           row.forEach((cell, i) => {
               const cellHeight = doc.heightOfString(String(cell || '-'), { width: table.columnWidths[i] });
@@ -145,6 +164,7 @@ class EmployeeController {
             drawHeader();
           }
 
+          doc.fontSize(7).font('Helvetica');
           let x = startX;
           row.forEach((cell, i) => {
             doc.text(String(cell || '-'), x, y, { width: table.columnWidths[i], align: 'left' });
