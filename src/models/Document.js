@@ -28,7 +28,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: { notEmpty: true }
     },
-    // Removido `uploadedAt` para usar `createdAt` do `timestamps: true` como data de upload
+    uploadedAt: { // Data/Hora de envio (automático)
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
     uploadedById: { // Responsável pelo envio (ID do AdminUser)
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -39,7 +43,7 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     tableName: 'documents',
-    timestamps: true, // Habilita createdAt (para upload) e updatedAt (para edição de metadados)
+    timestamps: false, // uploadedAt já está explícito, então não precisamos de createdAt/updatedAt padrão
   });
 
   Document.associate = (models) => {

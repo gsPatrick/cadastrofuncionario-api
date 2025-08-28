@@ -85,7 +85,7 @@ class DocumentService {
         documentType: documentType.trim(),
         description: description.trim(),
         filePath: file.path,
-        // `createdAt` será definido automaticamente pelo Sequelize
+        uploadedAt: new Date(),
       };
       
       documentRecords.push(record);
@@ -163,7 +163,7 @@ class DocumentService {
     try {
       const documents = await Document.findAll({
         where: whereClause,
-        order: [['createdAt', 'DESC']], // <-- MUDANÇA: usar createdAt
+        order: [['uploadedAt', 'DESC']],
         include: [
           { 
             model: Employee, 
@@ -184,43 +184,6 @@ class DocumentService {
       console.error('Erro ao buscar documentos:', error);
       throw new AppError('Erro ao buscar documentos.', 500);
     }
-  }
-
-  /**
-   * Atualiza os metadados de um documento existente.
-   * @param {number} documentId - ID do documento a ser atualizado.
-   * @param {number} editedById - ID do admin que está editando. (Pode ser útil para logs ou futuras auditorias)
-   * @param {object} updateData - Dados a serem atualizados (documentType, description).
-   * @returns {Promise<Document>} O documento atualizado.
-   */
-  static async updateDocument(documentId, editedById, updateData) {
-    console.log('=== DocumentService.updateDocument ===');
-    console.log('Document ID:', documentId);
-    console.log('Update Data:', updateData);
-    console.log('Edited By ID:', editedById);
-
-    if (!documentId) {
-      throw new AppError('ID do documento é obrigatório para atualização.', 400);
-    }
-
-    const document = await Document.findByPk(documentId);
-    if (!document) {
-      throw new AppError('Documento não encontrado para atualização.', 404);
-    }
-
-    // Aplica as atualizações. Sequelize irá atualizar 'updatedAt' automaticamente.
-    await document.update(updateData); 
-    
-    // Opcional: Recarregar com associações se necessário para o retorno
-    const updatedDocument = await Document.findByPk(documentId, {
-      include: [
-        { model: Employee, as: 'employee', attributes: ['id', 'fullName'] },
-        { model: AdminUser, as: 'uploadedBy', attributes: ['id', 'name'] }
-      ]
-    });
-
-    console.log('Documento atualizado com sucesso:', updatedDocument.id);
-    return updatedDocument;
   }
 
   /**

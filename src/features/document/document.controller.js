@@ -64,43 +64,6 @@ class DocumentController {
     }
   }
 
-  /**
-   * Atualiza os metadados de um documento.
-   */
-  static async updateDocument(req, res, next) {
-    try {
-      console.log('=== DEBUG UPDATE DOCUMENT ===');
-      console.log('Document ID:', req.params.documentId);
-      console.log('Body received:', req.body);
-      
-      const { documentId } = req.params;
-      const editedById = req.user.id; // Usuário que está realizando a edição
-
-      // Extrai os campos permitidos para atualização
-      const { documentType, description } = req.body;
-      const updateData = {};
-      if (documentType !== undefined) updateData.documentType = documentType;
-      if (description !== undefined) updateData.description = description;
-
-      if (Object.keys(updateData).length === 0) {
-        throw new AppError('Nenhum dado válido fornecido para atualização.', 400);
-      }
-
-      const updatedDocument = await DocumentService.updateDocument(documentId, editedById, updateData);
-      
-      console.log('Documento atualizado com sucesso:', updatedDocument.id);
-      
-      res.status(200).json({ 
-        status: 'success', 
-        message: 'Metadados do documento atualizados com sucesso.',
-        data: { document: updatedDocument } 
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar documento:', error);
-      next(error);
-    }
-  }
-
   static async deleteDocument(req, res, next) {
     try {
       console.log('=== DEBUG DELETE DOCUMENT ===');
