@@ -12,6 +12,7 @@ const { sequelize } = require('./models');
 const { AppError, globalErrorHandler } = require('./utils/errorHandler');
 const { AdminUser } = require('./models');
 const { hashPassword } = require('./utils/auth');
+const fs = require('fs');
 
 const PORT = process.env.PORT || 3000;
 
