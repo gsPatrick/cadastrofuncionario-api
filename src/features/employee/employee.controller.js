@@ -98,12 +98,17 @@ class EmployeeController {
       doc.fontSize(16).text('Relatório de Funcionários', { align: 'center' });
       doc.moveDown(2);
 
-      const table = {
-        headers: Object.keys(data[0]),
-        // Larguras de coluna definidas manualmente para melhor layout. A soma deve se aproximar da largura da página (A4 landscape ~780pt).
-        columnWidths: [ 25, 90, 50, 70, 50, 50, 60, 60, 50, 60, 60, 50, 40, 50, 30, 45, 70, 45, 45, 90, 30, 60, 50, 50, 25, 40, 60, 60, 60, 90, 90, 60, 90, 60, 60, 60 ],
-        rows: data.map(Object.values),
-      };
+      const headers = Object.keys(data[0]);
+      const rows = data.map(Object.values);
+      
+      // Definição de pesos proporcionais para cada coluna
+      const columnRatios = [ 0.5, 2.5, 1, 1.5, 1, 1, 1.5, 1.5, 1, 1.5, 1.5, 1, 1, 1, 0.8, 1, 1.5, 1, 1, 2, 1, 1.5, 1.5, 1.5, 0.5, 1, 1.5, 1.5, 1.5, 2.5, 2.5, 1, 3, 1.5, 1.5, 1.5 ];
+      const totalRatio = columnRatios.reduce((sum, ratio) => sum + ratio, 0);
+      const availableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      
+      const columnWidths = columnRatios.map(ratio => (ratio / totalRatio) * availableWidth);
+
+      const table = { headers, rows, columnWidths };
 
       const drawTable = (doc, table) => {
         let y = doc.y;
@@ -111,23 +116,22 @@ class EmployeeController {
         const rowSpacing = 5;
 
         const drawHeader = () => {
-          doc.fontSize(6).font('Helvetica-Bold');
+          doc.fontSize(5).font('Helvetica-Bold');
           let x = startX;
           table.headers.forEach((header, i) => {
-            doc.text(header, x, y, { width: table.columnWidths[i], align: 'left' });
+            doc.text(header.replace(/ /g, '\n'), x, y, { width: table.columnWidths[i], align: 'center' });
             x += table.columnWidths[i];
           });
-          y += 15; // Altura do cabeçalho
-          doc.moveTo(startX, y).lineTo(doc.page.width - doc.page.margins.right, y).stroke();
+          const headerHeight = doc.heightOfString(table.headers[1], {width: table.columnWidths[1]}) + rowSpacing; // Usa uma coluna de referência
+          y += headerHeight;
+          doc.moveTo(startX, y).lineTo(availableWidth + startX, y).stroke();
           y += rowSpacing;
         };
 
         const drawRow = (row) => {
           doc.fontSize(6).font('Helvetica');
           
-          // Calcula a altura da linha com base no conteúdo que mais precisa de espaço
           let maxHeight = 0;
-          let xForHeightCalc = startX;
           row.forEach((cell, i) => {
               const cellHeight = doc.heightOfString(String(cell || '-'), { width: table.columnWidths[i] });
               if (cellHeight > maxHeight) {
@@ -135,7 +139,6 @@ class EmployeeController {
               }
           });
 
-          // Verifica se a linha cabe na página atual, se não, adiciona nova página
           if (y + maxHeight > doc.page.height - doc.page.margins.bottom) {
             doc.addPage();
             y = doc.page.margins.top;
@@ -148,7 +151,7 @@ class EmployeeController {
             x += table.columnWidths[i];
           });
           y += maxHeight + rowSpacing;
-          doc.moveTo(startX, y - rowSpacing + 2).lineTo(doc.page.width - doc.page.margins.right, y - rowSpacing + 2).strokeColor('#cccccc').stroke();
+          doc.moveTo(startX, y - rowSpacing + 2).lineTo(availableWidth + startX, y - rowSpacing + 2).strokeColor('#cccccc').stroke();
         };
 
         drawHeader();
@@ -162,6 +165,7 @@ class EmployeeController {
       next(error);
     }
   }
+
 
   static async exportToExcel(req, res, next) {
     try {
