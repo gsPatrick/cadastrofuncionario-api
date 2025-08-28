@@ -3,76 +3,100 @@
 require('dotenv').config();
 
 const express = require('express');
+const bodyParser = require('body-parser');
+const morgan = require('morgan');
 const cors = require('cors');
-const fs = require('fs');
-
+const path = require('path'); // <-- 1. IMPORTAR O MÓDULO 'path' DO NODE.JS
 const allRoutes = require('./routes');
-const db = require('./models');
+const { sequelize } = require('./models');
+const { AppError, globalErrorHandler } = require('./utils/errorHandler');
+const { AdminUser } = require('./models');
+const { hashPassword } = require('./utils/auth');
 
+const PORT = process.env.PORT || 3000;
+
+// Middlewares
 const app = express();
-const PORT = process.env.APP_PORT || 3000;
 
-const corsOptions = {
-  origin: '*', 
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
+app.use(cors({
+  origin: '*',
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); 
 
 // ======================================================================
 // CORREÇÃO: Aumentando o limite do corpo da requisição
 // Adicione as opções { limit: '50mb' } aqui.
 // ======================================================================
-app.use(express.json({ limit: '1gb' }));
-app.use(express.urlencoded({ limit: '1gb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)){
     fs.mkdirSync(uploadDir);
 }
+app.use(morgan('dev'));
 
-// Suas rotas
+// <-- 2. ADICIONAR O MIDDLEWARE PARA SERVIR ARQUIVOS ESTÁTICOS -->
+// Torna a pasta 'uploads' publicamente acessível através da rota '/uploads'
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Rotas
 app.use('/api', allRoutes);
 
-const startServer = async () => {
+// Handler para rotas não encontradas (404)
+app.all('*', (req, res, next) => {
+  next(new AppError(`Não foi possível encontrar ${req.originalUrl} neste servidor!`, 404));
+});
+
+// Middleware de tratamento de erros global
+app.use(globalErrorHandler);
+
+// Função para criar o admin padrão
+async function createDefaultAdmin() {
   try {
-    await db.sequelize.authenticate();
-    console.log('Conexão com o banco de dados PostgreSQL estabelecida com sucesso.');
-    
-    // ATENÇÃO: Em produção, considere usar `sync({ force: false, alter: true })` ou migrações.
-    await db.sequelize.sync({force: true}); 
-    console.log('Todos os modelos foram sincronizados com sucesso.');
-
-    // SEEDING DO USUÁRIO ADMIN
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@empresa.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-    const adminExists = await db.User.findOne({ where: { email: adminEmail } });
-    
+    const adminExists = await AdminUser.findOne({ where: { email: 'admin@admin.com' } });
     if (!adminExists) {
-        await db.User.create({
-            nome: 'Administrador Padrão',
-            email: adminEmail,
-            password: adminPassword,
-            role: 'admin'
-        });
-        console.log(`>>> Usuário admin padrão criado:`);
-        console.log(`>>> Nome: Administrador Padrão`);
-        console.log(`>>> E-mail: ${adminEmail}`);
-        console.log(`>>> Senha: ${adminPassword}`);
+      console.log('Usuário administrador padrão não encontrado. Criando...');
+      const hashedPassword = await hashPassword('admin123');
+      const newAdmin = await AdminUser.create({
+        login: 'admin',
+        password: hashedPassword,
+        name: 'Administrador Padrão',
+        email: 'admin@admin.com',
+        isActive: true,
+      });
+      console.log('Usuário administrador padrão criado com sucesso:', newAdmin.toJSON());
+    } else {
+      console.log('Usuário administrador padrão já existe:', adminExists.toJSON());
     }
+  } catch (error) {
+    console.error('Falha ao tentar criar o usuário administrador padrão:', error);
+  }
+}
+
+
+// Conectar ao banco de dados e iniciar o servidor
+async function startServer() {
+  try {
+    await sequelize.authenticate();
+    console.log('Conexão com o banco de dados estabelecida com sucesso.');
+
+    // Para produção, use { alter: true } ou migrations.
+await sequelize.sync({ force: false });
+    console.log('Modelos sincronizados com o banco de dados.');
+
+    await createDefaultAdmin();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`🔗 Acesso local: http://localhost:${PORT}`);
+      console.log(`Servidor rodando na porta ${PORT}`);
     });
   } catch (error) {
-    console.error('❌ Não foi possível conectar ao banco de dados ou iniciar o servidor:', error);
+    console.error('Erro ao conectar ou sincronizar com o banco de dados:', error);
     process.exit(1);
   }
-};
+}
 
 startServer();
