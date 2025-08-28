@@ -62,7 +62,7 @@ class AnnotationService {
 
       // ==========================================================
       // CORREÇÃO APLICADA AQUI
-      // Garantir que `editedById` seja passado para criar o histórico.
+      // Garante que `editedById` seja passado para criar o histórico.
       // O `update` também precisa saber quem é o admin para o hook do modelo Employee, se aplicável.
       // ==========================================================
       await AnnotationHistory.create({

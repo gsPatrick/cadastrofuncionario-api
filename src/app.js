@@ -110,7 +110,7 @@ async function startServer() {
     console.log('Conexão com o banco de dados estabelecida com sucesso.');
 
     // Para produção, use { alter: true } ou migrations.
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ force: false });
     console.log('Modelos sincronizados com o banco de dados.');
 
     await createDefaultAdmin();
