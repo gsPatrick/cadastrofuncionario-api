@@ -6,7 +6,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const cors = require('cors');
-const path = require('path'); // <-- 1. IMPORTAR O MÓDULO 'path' DO NODE.JS
+const path = require('path');
 const allRoutes = require('./routes');
 const { sequelize } = require('./models');
 const { AppError, globalErrorHandler } = require('./utils/errorHandler');
@@ -26,13 +26,31 @@ app.use(cors({
   credentials: true
 }));
 
-
 // ======================================================================
-// CORREÇÃO: Aumentando o limite do corpo da requisição
-// Adicione as opções { limit: '50mb' } aqui.
+// CORREÇÃO: Middleware condicional para parsing do corpo da requisição
 // ======================================================================
-app.use(express.json({ limit: '1gb' }));
-app.use(express.urlencoded({ limit: '1gb', extended: true }));
+app.use((req, res, next) => {
+  const contentType = req.get('Content-Type') || '';
+  
+  // Skip JSON/URL parsing for multipart/form-data (file uploads)
+  if (contentType.startsWith('multipart/form-data')) {
+    console.log('Skipping body parsing for multipart/form-data request');
+    return next();
+  }
+  
+  // Apply JSON parsing for other requests
+  if (contentType.startsWith('application/json')) {
+    return express.json({ limit: '1gb' })(req, res, next);
+  }
+  
+  // Apply URL-encoded parsing for form submissions
+  if (contentType.startsWith('application/x-www-form-urlencoded')) {
+    return express.urlencoded({ limit: '1gb', extended: true })(req, res, next);
+  }
+  
+  // For other content types, continue without parsing
+  next();
+});
 
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)){
@@ -40,7 +58,6 @@ if (!fs.existsSync(uploadDir)){
 }
 app.use(morgan('dev'));
 
-// <-- 2. ADICIONAR O MIDDLEWARE PARA SERVIR ARQUIVOS ESTÁTICOS -->
 // Torna a pasta 'uploads' publicamente acessível através da rota '/uploads'
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
@@ -78,7 +95,6 @@ async function createDefaultAdmin() {
   }
 }
 
-
 // Conectar ao banco de dados e iniciar o servidor
 async function startServer() {
   try {
@@ -86,7 +102,7 @@ async function startServer() {
     console.log('Conexão com o banco de dados estabelecida com sucesso.');
 
     // Para produção, use { alter: true } ou migrations.
-await sequelize.sync({ force: false });
+    await sequelize.sync({ force: false });
     console.log('Modelos sincronizados com o banco de dados.');
 
     await createDefaultAdmin();
