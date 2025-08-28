@@ -60,17 +60,25 @@ class AnnotationService {
         throw new AppError('Anotação não encontrada.', 404);
       }
 
-      // Cria o registro de histórico com os dados *antes* da atualização
+      // ==========================================================
+      // CORREÇÃO APLICADA AQUI
+      // Garantir que `editedById` seja passado para criar o histórico.
+      // O `update` também precisa saber quem é o admin para o hook do modelo Employee, se aplicável.
+      // ==========================================================
       await AnnotationHistory.create({
         annotationId: annotation.id,
         oldTitle: annotation.title,
         oldContent: annotation.content,
         oldCategory: annotation.category,
-        editedById: editedById,
+        editedById: editedById, // Usando o ID do usuário que veio do controller
       }, { transaction: t });
 
-      // Atualiza a anotação com os novos dados
-      await annotation.update(updateData, { transaction: t });
+      // Atualiza a anotação com os novos dados e passa o ID do admin nas opções
+      // para que qualquer hook 'afterUpdate' possa usá-lo.
+      await annotation.update(updateData, { 
+        transaction: t,
+        adminUserId: editedById // Passando o ID para os hooks
+      });
       return annotation;
     });
     return result;
