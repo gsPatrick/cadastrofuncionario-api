@@ -35,7 +35,6 @@ class EmployeeController {
 
   static async updateEmployee(req, res, next) {
     try {
-      // Pega o ID do admin logado a partir do token (req.user.id)
       const adminUserId = req.user.id; 
       const updatedEmployee = await EmployeeService.updateEmployee(req.params.id, req.body, adminUserId);
       res.status(200).json({ status: 'success', data: { employee: updatedEmployee } });
@@ -53,7 +52,6 @@ class EmployeeController {
     } catch (error) { next(error); }
   }
   
-  // --- NOVO MÉTODO PARA HISTÓRICO ---
   static async getEmployeeHistory(req, res, next) {
     try {
       const history = await EmployeeService.getEmployeeHistoryById(req.params.id);
@@ -73,10 +71,14 @@ class EmployeeController {
       const data = await EmployeeService.getEmployeesForExport({ search, filters });
       if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
 
+      // As chaves do primeiro objeto são os cabeçalhos
       const columns = Object.keys(data[0]);
-      stringify([columns, ...data.map(Object.values)], (err, output) => {
+      // Os valores de cada objeto são as linhas
+      const rows = data.map(Object.values);
+
+      stringify([columns, ...rows], (err, output) => {
         if (err) return next(new AppError('Erro ao gerar o arquivo CSV.', 500));
-        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.csv`);
         res.status(200).send(output);
       });
@@ -85,31 +87,68 @@ class EmployeeController {
 
   static async exportToPdf(req, res, next) {
     try {
-      const { search, ...filters } = req.query;
-      const data = await EmployeeService.getEmployeesForExport({ search, filters });
-      if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
+        const { search, ...filters } = req.query;
+        const data = await EmployeeService.getEmployeesForExport({ search, filters });
+        if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
 
-      const doc = new PDFDocument({ margin: 30, size: 'A4' });
+        // Usa modo paisagem para caber mais colunas
+        const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
 
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.pdf`);
-      doc.pipe(res);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.pdf`);
+        doc.pipe(res);
 
-      doc.fontSize(18).text('Relatório de Funcionários', { align: 'center' });
-      doc.moveDown();
+        doc.fontSize(16).text('Relatório de Funcionários', { align: 'center' });
+        doc.moveDown();
 
-      data.forEach(employee => {
-        doc.fontSize(12).text(`ID: ${employee.ID}`, { continued: true }).text(` - Matrícula: ${employee.Matrícula}`);
-        doc.fontSize(14).text(employee['Nome Completo'], { underline: true });
-        doc.fontSize(10).text(`Cargo: ${employee.Cargo} - Departamento: ${employee.Departamento}`);
-        doc.text(`Email: ${employee['Email Institucional']} - CPF: ${employee.CPF}`);
-        doc.text(`Status: ${employee['Status Funcional']}`);
-        doc.moveDown(1.5);
-      });
+        const tableTop = doc.y;
+        const tableHeaders = Object.keys(data[0]);
 
-      doc.end();
-    } catch (error) { next(error); }
+        // Função para desenhar o cabeçalho da tabela
+        const generateHeader = (doc, y) => {
+            doc.fontSize(8).fillColor('black');
+            let x = 30;
+            const columnSpacing = (doc.page.width - 60) / tableHeaders.length;
+            tableHeaders.forEach(header => {
+                doc.text(header, x, y, { width: columnSpacing, align: 'left' });
+                x += columnSpacing;
+            });
+            doc.moveTo(30, y + 15).lineTo(doc.page.width - 30, y + 15).stroke();
+        };
+
+        // Função para desenhar uma linha da tabela
+        const generateRow = (doc, y, row) => {
+            doc.fontSize(7).fillColor('black');
+            let x = 30;
+            const columnSpacing = (doc.page.width - 60) / tableHeaders.length;
+            Object.values(row).forEach(cell => {
+                doc.text(String(cell || '-'), x, y, { width: columnSpacing, align: 'left' });
+                x += columnSpacing;
+            });
+            doc.moveTo(30, y + 20).lineTo(doc.page.width - 30, y + 20).stroke();
+        };
+
+        generateHeader(doc, tableTop);
+        let y = tableTop + 25;
+
+        for (const row of data) {
+            // Se a próxima linha for ultrapassar a página, cria uma nova página
+            if (y > doc.page.height - 50) {
+                doc.addPage();
+                y = 30; // Posição inicial na nova página
+                generateHeader(doc, y);
+                y += 25;
+            }
+            generateRow(doc, y, row);
+            y += 25;
+        }
+
+        doc.end();
+    } catch (error) {
+        next(error);
+    }
   }
+
 
   static async exportToExcel(req, res, next) {
     try {
@@ -120,12 +159,14 @@ class EmployeeController {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Funcionários');
 
+      // Define as colunas com base nas chaves do primeiro objeto de dados
       worksheet.columns = Object.keys(data[0]).map(key => ({
         header: key,
         key: key,
-        width: Math.max(key.length, 20)
+        width: Math.max(key.length, 20) // Largura mínima
       }));
 
+      // Adiciona as linhas de dados
       worksheet.addRows(data);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

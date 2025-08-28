@@ -75,7 +75,7 @@ async function startServer() {
     await sequelize.authenticate();
     console.log('Conexão com o banco de dados estabelecida com sucesso.');
 
-    // ATENÇÃO: sequelize.sync({ force: true }) apaga o banco a cada reinício.
+      sequelize.sync({ force: true })
     // Para produção, use { alter: true } ou migrations.
     await sequelize.sync({ alter: true }); 
     console.log('Modelos sincronizados com o banco de dados.');

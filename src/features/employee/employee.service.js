@@ -180,26 +180,52 @@ class EmployeeService {
   }
 
   /**
-   * Prepara os dados de funcionários para exportação.
+   * Prepara os dados de funcionários para exportação com TODOS os campos.
    * @param {object} options - Opções de busca e filtros.
    * @returns {Promise<object[]>} Array de dados dos funcionários.
    */
   static async getEmployeesForExport({ search, filters }) {
+    // Busca todos os funcionários que correspondem aos filtros (sem paginação)
     const { employees } = await this.getAllEmployees({ search, filters, page: 1, limit: 10000 });
 
+    // Mapeia os dados brutos para um formato com cabeçalhos amigáveis
     return employees.map(emp => ({
-      ID: emp.id,
+      'ID': emp.id,
       'Nome Completo': emp.fullName,
-      Matrícula: emp.registrationNumber,
+      'Matrícula': emp.registrationNumber,
       'Vínculo Institucional': emp.institutionalLink,
-      Cargo: emp.position,
-      Departamento: emp.department,
+      'Cargo': emp.position,
+      'Função': emp.role,
+      'Departamento': emp.department,
+      'Lotação Atual': emp.currentAssignment,
       'Data de Admissão': emp.admissionDate,
+      'Nível de Formação': emp.educationLevel,
+      'Área de Formação': emp.educationArea,
       'Data de Nascimento': emp.dateOfBirth,
-      CPF: emp.cpf,
-      RG: emp.rg,
-      'Email Institucional': emp.institutionalEmail,
-      'Status Funcional': emp.functionalStatus,
+      'Gênero': emp.gender,
+      'Estado Civil': emp.maritalStatus,
+      'Possui Filhos': emp.hasChildren ? 'Sim' : 'Não',
+      'Número de Filhos': emp.numberOfChildren,
+      'CPF': emp.cpf,
+      'RG': emp.rg,
+      'Órgão Emissor (RG)': emp.rgIssuer,
+      'Logradouro': emp.addressStreet,
+      'Número (Endereço)': emp.addressNumber,
+      'Complemento': emp.addressComplement,
+      'Bairro': emp.addressNeighborhood,
+      'Cidade': emp.addressCity,
+      'Estado (UF)': emp.addressState,
+      'CEP': emp.addressZipCode,
+      'Telefone de Emergência': emp.emergencyContactPhone,
+      'Celular 1': emp.mobilePhone1,
+      'Celular 2': emp.mobilePhone2,
+      'E-mail Institucional': emp.institutionalEmail,
+      'E-mail Pessoal': emp.personalEmail,
+      'Situação Funcional': emp.functionalStatus,
+      'Observações Gerais': emp.generalObservations,
+      'Comorbidade': emp.comorbidity,
+      'Deficiência': emp.disability,
+      'Tipo Sanguíneo': emp.bloodType,
     }));
   }
 

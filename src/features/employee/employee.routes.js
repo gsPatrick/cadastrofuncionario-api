@@ -1,5 +1,3 @@
-// features/employee/employee.routes.js
-
 const express = require('express');
 const EmployeeController = require('./employee.controller');
 const { authMiddleware, authorizeAdmin } = require('../../utils/auth');

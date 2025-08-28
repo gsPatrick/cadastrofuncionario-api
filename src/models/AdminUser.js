@@ -1,4 +1,4 @@
-// models/AdminUser.js
+
 
 module.exports = (sequelize, DataTypes) => {
   const AdminUser = sequelize.define('AdminUser', {

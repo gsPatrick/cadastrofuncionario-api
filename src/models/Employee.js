@@ -1,5 +1,3 @@
-// models/Employee.js - VERSÃO FINAL CORRIGIDA
-
 // Mapeamento de nomes de campos para nomes amigáveis para o histórico
 const fieldDisplayNames = {
   fullName: 'Nome Completo',
@@ -127,7 +125,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(11),
       allowNull: false,
       unique: true,
-      validate: { notEmpty: true, len: [11, 11] }
+      validate: { notEmpty: true }
     },
     rg: {
       type: DataTypes.STRING,
@@ -166,7 +164,6 @@ module.exports = (sequelize, DataTypes) => {
     addressZipCode: {
       type: DataTypes.STRING(8),
       allowNull: false,
-      validate: { len: [8, 8] }
     },
     emergencyContactPhone: {
       type: DataTypes.STRING,
