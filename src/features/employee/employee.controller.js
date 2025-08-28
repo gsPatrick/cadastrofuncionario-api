@@ -71,9 +71,7 @@ class EmployeeController {
       const data = await EmployeeService.getEmployeesForExport({ search, filters });
       if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
 
-      // As chaves do primeiro objeto são os cabeçalhos
       const columns = Object.keys(data[0]);
-      // Os valores de cada objeto são as linhas
       const rows = data.map(Object.values);
 
       stringify([columns, ...rows], (err, output) => {
@@ -87,68 +85,83 @@ class EmployeeController {
 
   static async exportToPdf(req, res, next) {
     try {
-        const { search, ...filters } = req.query;
-        const data = await EmployeeService.getEmployeesForExport({ search, filters });
-        if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
+      const { search, ...filters } = req.query;
+      const data = await EmployeeService.getEmployeesForExport({ search, filters });
+      if (data.length === 0) return next(new AppError('Nenhum funcionário encontrado para exportar.', 404));
 
-        // Usa modo paisagem para caber mais colunas
-        const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 30, bottom: 30, left: 30, right: 30 } });
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.pdf`);
-        doc.pipe(res);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=funcionarios-${Date.now()}.pdf`);
+      doc.pipe(res);
 
-        doc.fontSize(16).text('Relatório de Funcionários', { align: 'center' });
-        doc.moveDown();
+      doc.fontSize(16).text('Relatório de Funcionários', { align: 'center' });
+      doc.moveDown(2);
 
-        const tableTop = doc.y;
-        const tableHeaders = Object.keys(data[0]);
+      const table = {
+        headers: Object.keys(data[0]),
+        // Larguras de coluna definidas manualmente para melhor layout. A soma deve se aproximar da largura da página (A4 landscape ~780pt).
+        columnWidths: [ 25, 90, 50, 70, 50, 50, 60, 60, 50, 60, 60, 50, 40, 50, 30, 45, 70, 45, 45, 90, 30, 60, 50, 50, 25, 40, 60, 60, 60, 90, 90, 60, 90, 60, 60, 60 ],
+        rows: data.map(Object.values),
+      };
 
-        // Função para desenhar o cabeçalho da tabela
-        const generateHeader = (doc, y) => {
-            doc.fontSize(8).fillColor('black');
-            let x = 30;
-            const columnSpacing = (doc.page.width - 60) / tableHeaders.length;
-            tableHeaders.forEach(header => {
-                doc.text(header, x, y, { width: columnSpacing, align: 'left' });
-                x += columnSpacing;
-            });
-            doc.moveTo(30, y + 15).lineTo(doc.page.width - 30, y + 15).stroke();
+      const drawTable = (doc, table) => {
+        let y = doc.y;
+        const startX = doc.page.margins.left;
+        const rowSpacing = 5;
+
+        const drawHeader = () => {
+          doc.fontSize(6).font('Helvetica-Bold');
+          let x = startX;
+          table.headers.forEach((header, i) => {
+            doc.text(header, x, y, { width: table.columnWidths[i], align: 'left' });
+            x += table.columnWidths[i];
+          });
+          y += 15; // Altura do cabeçalho
+          doc.moveTo(startX, y).lineTo(doc.page.width - doc.page.margins.right, y).stroke();
+          y += rowSpacing;
         };
 
-        // Função para desenhar uma linha da tabela
-        const generateRow = (doc, y, row) => {
-            doc.fontSize(7).fillColor('black');
-            let x = 30;
-            const columnSpacing = (doc.page.width - 60) / tableHeaders.length;
-            Object.values(row).forEach(cell => {
-                doc.text(String(cell || '-'), x, y, { width: columnSpacing, align: 'left' });
-                x += columnSpacing;
-            });
-            doc.moveTo(30, y + 20).lineTo(doc.page.width - 30, y + 20).stroke();
+        const drawRow = (row) => {
+          doc.fontSize(6).font('Helvetica');
+          
+          // Calcula a altura da linha com base no conteúdo que mais precisa de espaço
+          let maxHeight = 0;
+          let xForHeightCalc = startX;
+          row.forEach((cell, i) => {
+              const cellHeight = doc.heightOfString(String(cell || '-'), { width: table.columnWidths[i] });
+              if (cellHeight > maxHeight) {
+                  maxHeight = cellHeight;
+              }
+          });
+
+          // Verifica se a linha cabe na página atual, se não, adiciona nova página
+          if (y + maxHeight > doc.page.height - doc.page.margins.bottom) {
+            doc.addPage();
+            y = doc.page.margins.top;
+            drawHeader();
+          }
+
+          let x = startX;
+          row.forEach((cell, i) => {
+            doc.text(String(cell || '-'), x, y, { width: table.columnWidths[i], align: 'left' });
+            x += table.columnWidths[i];
+          });
+          y += maxHeight + rowSpacing;
+          doc.moveTo(startX, y - rowSpacing + 2).lineTo(doc.page.width - doc.page.margins.right, y - rowSpacing + 2).strokeColor('#cccccc').stroke();
         };
 
-        generateHeader(doc, tableTop);
-        let y = tableTop + 25;
+        drawHeader();
+        table.rows.forEach(drawRow);
+      };
 
-        for (const row of data) {
-            // Se a próxima linha for ultrapassar a página, cria uma nova página
-            if (y > doc.page.height - 50) {
-                doc.addPage();
-                y = 30; // Posição inicial na nova página
-                generateHeader(doc, y);
-                y += 25;
-            }
-            generateRow(doc, y, row);
-            y += 25;
-        }
+      drawTable(doc, table);
+      doc.end();
 
-        doc.end();
     } catch (error) {
-        next(error);
+      next(error);
     }
   }
-
 
   static async exportToExcel(req, res, next) {
     try {
@@ -159,14 +172,12 @@ class EmployeeController {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Funcionários');
 
-      // Define as colunas com base nas chaves do primeiro objeto de dados
       worksheet.columns = Object.keys(data[0]).map(key => ({
         header: key,
         key: key,
-        width: Math.max(key.length, 20) // Largura mínima
+        width: Math.max(key.length, 25)
       }));
 
-      // Adiciona as linhas de dados
       worksheet.addRows(data);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
