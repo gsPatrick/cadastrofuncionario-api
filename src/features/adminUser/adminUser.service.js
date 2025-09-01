@@ -1,4 +1,5 @@
-const { AdminUser } = require('../../models');
+const { AdminUser, sequelize } = require('../../models'); // Importar sequelize para acesso a Op
+const { Op } = require('sequelize'); // A FORMA MAIS DIRETA DE IMPORTAR Op
 const { hashPassword, comparePassword, generateToken } = require('../../utils/auth');
 const { AppError } = require('../../utils/errorHandler');
 const { enforceCase } = require('../../utils/textFormatter');
@@ -16,9 +17,13 @@ class AdminUserService {
     const formattedName = enforceCase(name);
     const formattedEmail = email.toLowerCase();
 
+    // ==========================================================
+    // CORREÇÃO APLICADA AQUI
+    // Usando o 'Op' importado diretamente do Sequelize.
+    // ==========================================================
     const existingUser = await AdminUser.findOne({
       where: {
-        [AdminUser.sequelize.Op.or]: [{ login: formattedLogin }, { email: formattedEmail }],
+        [Op.or]: [{ login: formattedLogin }, { email: formattedEmail }],
       },
     });
 
@@ -41,9 +46,9 @@ class AdminUserService {
       password: hashedPassword,
       name: formattedName,
       email: formattedEmail,
-      role: role || 'rh', // Padrão é RH
+      role: role || 'rh',
       isActive: isActive === undefined ? true : isActive,
-      permissions: role === 'rh' ? permissions : null, // Salva permissões apenas se for RH
+      permissions: role === 'rh' ? permissions : null,
     });
 
     const userResponse = newAdminUser.toJSON();
@@ -67,7 +72,6 @@ class AdminUserService {
 
     const token = generateToken(user);
 
-    // Retorna a role e as permissões granulares para o frontend
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -75,7 +79,7 @@ class AdminUserService {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
-      permissions: user.permissions, // ESSENCIAL PARA O FRONTEND
+      permissions: user.permissions,
     };
 
     return { token, user: userResponse };
@@ -90,7 +94,6 @@ class AdminUserService {
       throw new AppError('Usuário administrador não encontrado.', 404);
     }
 
-    // Um usuário não pode alterar suas próprias permissões ou status.
     if (Number(currentUserId) === Number(targetUserId)) {
       throw new AppError('Você não pode alterar suas próprias permissões ou status.', 403);
     }
@@ -108,8 +111,6 @@ class AdminUserService {
     if (role) userToUpdate.role = role;
     if (isActive !== undefined) userToUpdate.isActive = isActive;
     
-    // Se o perfil for 'admin', as permissões granulares são limpas.
-    // Se for 'rh', elas são salvas.
     userToUpdate.permissions = role === 'rh' ? permissions : null;
     
     await userToUpdate.save();
@@ -132,7 +133,6 @@ class AdminUserService {
       throw new AppError('Usuário administrador não encontrado.', 404);
     }
 
-    // Impede que o último admin seja deletado
     if (user.role === 'admin') {
       const adminCount = await AdminUser.count({ where: { role: 'admin' } });
       if (adminCount <= 1) {
@@ -181,7 +181,7 @@ class AdminUserService {
     const user = await AdminUser.findOne({
       where: {
         passwordResetToken: hashedToken,
-        passwordResetExpires: { [AdminUser.sequelize.Op.gt]: Date.now() },
+        passwordResetExpires: { [Op.gt]: Date.now() },
       },
     });
 
