@@ -12,32 +12,20 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      validate: {
-        notEmpty: true,
-      }
     },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        notEmpty: true,
-      }
     },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        notEmpty: true,
-      }
     },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      validate: {
-        isEmail: true,
-        notEmpty: true,
-      }
+      validate: { isEmail: true }
     },
     isActive: {
       type: DataTypes.BOOLEAN,
@@ -45,13 +33,18 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: true,
     },
     // ==========================================================
-    // NOVO CAMPO ADICIONADO AQUI
+    // MUDANÇA ESTRUTURAL APLICADA AQUI
     // ==========================================================
     role: {
-      type: DataTypes.ENUM('superadmin', 'admin'),
+      type: DataTypes.ENUM('admin', 'rh'),
       allowNull: false,
-      defaultValue: 'admin',
-      comment: 'Define o nível de permissão do usuário. "superadmin" pode gerenciar outros admins.'
+      defaultValue: 'rh',
+      comment: 'Define o perfil base. "admin" tem acesso total, "rh" tem permissões granulares.'
+    },
+    permissions: {
+      type: DataTypes.JSONB,
+      allowNull: true, // Nulo para admins, preenchido para RH
+      comment: 'Armazena permissões granulares para usuários do perfil RH (ex: { employee: { create: true } })'
     },
     passwordResetToken: {
       type: DataTypes.STRING,

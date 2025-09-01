@@ -1,32 +1,34 @@
 const express = require('express');
 const EmployeeController = require('./employee.controller');
-const { authMiddleware, authorize } = require('../../utils/auth');
+const { authMiddleware, authorize } = require('../../utils/auth'); // authorize importado
 const { validateEmployeeCreation, validateEmployeeUpdate } = require('./employee.validator');
 const handleValidationErrors = require('../../utils/validationHandler');
-const documentRouter = require('../document/document.routes');
-const annotationRouter = require('../annotation/annotation.routes');
+// ... outros imports
 
 const router = express.Router();
+router.use(authMiddleware); // Aplica autenticação a todas as rotas
 
-router.use(authMiddleware);
-router.use(authorize);
+// GET /employees - Requer permissão de leitura, mas vamos simplificar para 'edit' por enquanto
+router.get('/', authorize('employee:edit'), EmployeeController.getAllEmployees);
 
-router.get('/export/csv', EmployeeController.exportToCsv);
-router.get('/export/pdf', EmployeeController.exportToPdf);
-router.get('/export/excel', EmployeeController.exportToExcel);
+// POST /employees - Requer permissão de criação
+router.post('/', authorize('employee:create'), validateEmployeeCreation, handleValidationErrors, EmployeeController.createEmployee);
 
-router.route('/')
-  .post(validateEmployeeCreation, handleValidationErrors, EmployeeController.createEmployee)
-  .get(EmployeeController.getAllEmployees);
+// GET /employees/:id
+router.get('/:id', authorize('employee:edit'), EmployeeController.getEmployeeById);
 
-router.route('/:id')
-  .get(EmployeeController.getEmployeeById)
-  .put(validateEmployeeUpdate, handleValidationErrors, EmployeeController.updateEmployee)
-  .delete(EmployeeController.deleteEmployee);
+// PUT /employees/:id - Requer permissão de edição
+router.put('/:id', authorize('employee:edit'), validateEmployeeUpdate, handleValidationErrors, EmployeeController.updateEmployee);
 
-// --- NOVA ROTA PARA HISTÓRICO ---
-router.get('/:id/history', EmployeeController.getEmployeeHistory);
+// DELETE /employees/:id - Requer permissão de exclusão
+router.delete('/:id', authorize('employee:delete'), EmployeeController.deleteEmployee);
 
+// ... (outras rotas como histórico e exportação podem usar 'employee:edit' como base)
+router.get('/:id/history', authorize('employee:edit'), EmployeeController.getEmployeeHistory);
+router.get('/export/csv', authorize('employee:edit'), EmployeeController.exportToCsv);
+// ...
+
+// Rotas aninhadas
 router.use('/:employeeId/documents', documentRouter);
 router.use('/:employeeId/annotations', annotationRouter);
 

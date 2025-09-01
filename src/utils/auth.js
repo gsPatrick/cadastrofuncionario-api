@@ -19,61 +19,68 @@ const comparePassword = async (plainPassword, hashedPassword) => {
 
 const generateToken = (user) => {
   return jwt.sign(
-    // ==========================================================
-    // CORREÇÃO APLICADA AQUI: Adiciona role ao token
-    // ==========================================================
-    { id: user.id, login: user.login, role: user.role },
+    { id: user.id, login: user.login, role: user.role }, // A role no token ainda é útil
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
 };
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   let token = req.header('Authorization');
 
-  if (!token) {
+  if (!token || !token.startsWith('Bearer ')) {
     return next(new AppError('Acesso negado. Token não fornecido.', 401));
   }
 
-  if (token.startsWith('Bearer ')) {
-    token = token.slice(7, token.length);
-  }
-
   try {
+    token = token.slice(7, token.length);
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    
+    // Anexa o usuário completo do banco à requisição para ter as permissões sempre atualizadas
+    const currentUser = await AdminUser.findByPk(decoded.id);
+    if (!currentUser) {
+        return next(new AppError('Usuário associado a este token não existe mais.', 401));
+    }
+    
+    req.user = currentUser; // Anexa o objeto completo do Sequelize
     next();
   } catch (err) {
     return next(new AppError('Token inválido ou expirado.', 401));
   }
 };
 
+// ==========================================================
+// NOVO E PODEROSO MIDDLEWARE DE AUTORIZAÇÃO
+// ==========================================================
 /**
- * Middleware de autorização baseado em roles.
- * @param {Array<string>} allowedRoles - Array de roles permitidas (ex: ['superadmin']).
+ * Middleware de autorização granular.
+ * @param {string} requiredPermission - A permissão no formato 'entidade:acao' (ex: 'employee:create').
  */
-const authorize = (allowedRoles) => {
-  return async (req, res, next) => {
-    if (!req.user || !req.user.id) {
+const authorize = (requiredPermission) => {
+  return (req, res, next) => {
+    const user = req.user; // Obtém o usuário completo anexado pelo authMiddleware
+
+    if (!user) {
       return next(new AppError('Acesso proibido. Autenticação necessária.', 403));
     }
-    
-    try {
-      // Busca o usuário no banco para garantir que a role está atualizada
-      const user = await AdminUser.findByPk(req.user.id);
-      
-      if (!user) {
-        return next(new AppError('Usuário não encontrado.', 403));
-      }
-      
-      if (allowedRoles.includes(user.role)) {
-        return next(); // Usuário tem a permissão necessária
-      }
-      
-      return next(new AppError('Acesso proibido. Você não tem permissão para realizar esta ação.', 403));
-    } catch (error) {
-      return next(error);
+
+    // Perfil 'admin' tem acesso irrestrito a tudo.
+    if (user.role === 'admin') {
+      return next();
     }
+
+    // Para o perfil 'rh', verificamos as permissões granulares.
+    if (user.role === 'rh') {
+      const [entity, action] = requiredPermission.split(':');
+      
+      // Verifica se o objeto de permissões existe e se a permissão específica é true
+      if (user.permissions && user.permissions[entity] && user.permissions[entity][action] === true) {
+        return next(); // Permissão concedida
+      }
+    }
+    
+    // Se chegou até aqui, o acesso é negado.
+    return next(new AppError('Acesso proibido. Você não tem permissão para realizar esta ação.', 403));
   };
 };
 
@@ -82,6 +89,6 @@ module.exports = {
   comparePassword,
   generateToken,
   authMiddleware,
-  authorize, // Exporta o novo middleware
+  authorize,
   JWT_SECRET,
 };

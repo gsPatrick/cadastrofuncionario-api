@@ -1,19 +1,16 @@
 const { AdminUser } = require('../../models');
-const { hashPassword, comparePassword, generateToken, JWT_SECRET } = require('../../utils/auth');
+const { hashPassword, comparePassword, generateToken } = require('../../utils/auth');
 const { AppError } = require('../../utils/errorHandler');
 const { enforceCase } = require('../../utils/textFormatter');
 const { sendEmail } = require('../../utils/emailService');
-const crypto = require('crypto'); // Módulo nativo do Node.js para gerar tokens aleatórios
+const crypto = require('crypto');
 
 class AdminUserService {
   /**
-   * Registra um novo usuário administrador.
-   * Apenas um admin existente pode registrar um novo admin.
-   * @param {object} adminUserData - Dados do novo admin.
-   * @returns {Promise<AdminUser>} O novo usuário administrador criado.
+   * Registra um novo usuário (Admin ou RH).
    */
   static async register(adminUserData) {
-    const { login, password, name, email, role, isActive } = adminUserData;
+    const { login, password, name, email, role, isActive, permissions } = adminUserData;
 
     const formattedLogin = enforceCase(login);
     const formattedName = enforceCase(name);
@@ -34,6 +31,9 @@ class AdminUserService {
       }
     }
 
+    if (!password) {
+        throw new AppError('Senha é obrigatória para criar um novo usuário.', 400);
+    }
     const hashedPassword = await hashPassword(password);
 
     const newAdminUser = await AdminUser.create({
@@ -41,8 +41,9 @@ class AdminUserService {
       password: hashedPassword,
       name: formattedName,
       email: formattedEmail,
-      role: role || 'admin',
+      role: role || 'rh', // Padrão é RH
       isActive: isActive === undefined ? true : isActive,
+      permissions: role === 'rh' ? permissions : null, // Salva permissões apenas se for RH
     });
 
     const userResponse = newAdminUser.toJSON();
@@ -51,10 +52,7 @@ class AdminUserService {
   }
 
   /**
-   * Autentica um usuário administrador.
-   * @param {string} login - O login do usuário.
-   * @param {string} password - A senha em texto puro.
-   * @returns {Promise<{ token: string, user: object }>} Token JWT e dados do usuário.
+   * Autentica um usuário e retorna seus dados, incluindo a role e permissões.
    */
   static async login(login, password) {
     const user = await AdminUser.findOne({ where: { login } });
@@ -69,53 +67,22 @@ class AdminUserService {
 
     const token = generateToken(user);
 
-    // ==========================================================
-    // CORREÇÃO APLICADA AQUI
-    // ==========================================================
-    // Montamos o objeto de resposta manualmente para garantir que a 'role' seja incluída.
+    // Retorna a role e as permissões granulares para o frontend
     const userResponse = {
       id: user.id,
       name: user.name,
       login: user.login,
       email: user.email,
       role: user.role,
-      isActive: user.isActive
+      isActive: user.isActive,
+      permissions: user.permissions, // ESSENCIAL PARA O FRONTEND
     };
 
     return { token, user: userResponse };
   }
-
-  /**
-   * Obtém todos os usuários administradores (sem a senha).
-   * @returns {Promise<AdminUser[]>} Lista de usuários administradores.
-   */
-  static async getAll() {
-    return AdminUser.findAll({
-      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
-    });
-  }
-
-  /**
-   * Obtém um usuário administrador por ID (sem a senha).
-   * @param {number} id - O ID do usuário.
-   * @returns {Promise<AdminUser>} O usuário administrador.
-   */
-  static async getById(id) {
-    const user = await AdminUser.findByPk(id, {
-      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
-    });
-    if (!user) {
-      throw new AppError('Usuário administrador não encontrado.', 404);
-    }
-    return user;
-  }
   
   /**
-   * Atualiza os dados de um usuário administrador.
-   * @param {number} currentUserId - O ID do usuário que está fazendo a alteração.
-   * @param {number} targetUserId - O ID do usuário a ser atualizado.
-   * @param {object} updateData - Os dados a serem atualizados.
-   * @returns {Promise<AdminUser>} O usuário administrador atualizado.
+   * Atualiza os dados e permissões de um usuário.
    */
   static async update(currentUserId, targetUserId, updateData) {
     const userToUpdate = await AdminUser.findByPk(targetUserId);
@@ -123,27 +90,27 @@ class AdminUserService {
       throw new AppError('Usuário administrador não encontrado.', 404);
     }
 
-    if (Number(currentUserId) === Number(targetUserId) && (updateData.role !== undefined || updateData.isActive !== undefined)) {
-        throw new AppError('Você não pode alterar seu próprio perfil ou status.', 403);
+    // Um usuário não pode alterar suas próprias permissões ou status.
+    if (Number(currentUserId) === Number(targetUserId)) {
+      throw new AppError('Você não pode alterar suas próprias permissões ou status.', 403);
     }
 
-    if ((updateData.role === 'admin' || updateData.isActive === false) && userToUpdate.role === 'superadmin') {
-      const superadminCount = await AdminUser.count({ where: { role: 'superadmin', isActive: true } });
-      if (superadminCount <= 1) {
-        throw new AppError('Não é possível rebaixar ou desativar o último superadministrador.', 403);
-      }
-    }
-    
-    if (updateData.name) userToUpdate.name = enforceCase(updateData.name);
-    if (updateData.login) userToUpdate.login = enforceCase(updateData.login);
-    if (updateData.email) userToUpdate.email = updateData.email.toLowerCase();
-    
-    if (updateData.role) userToUpdate.role = updateData.role;
-    if (updateData.isActive !== undefined) userToUpdate.isActive = updateData.isActive;
+    const { name, login, email, password, role, isActive, permissions } = updateData;
 
-    if (updateData.password) {
-      userToUpdate.password = await hashPassword(updateData.password);
+    if (name) userToUpdate.name = enforceCase(name);
+    if (login) userToUpdate.login = enforceCase(login);
+    if (email) userToUpdate.email = email.toLowerCase();
+    
+    if (password) {
+      userToUpdate.password = await hashPassword(password);
     }
+
+    if (role) userToUpdate.role = role;
+    if (isActive !== undefined) userToUpdate.isActive = isActive;
+    
+    // Se o perfil for 'admin', as permissões granulares são limpas.
+    // Se for 'rh', elas são salvas.
+    userToUpdate.permissions = role === 'rh' ? permissions : null;
     
     await userToUpdate.save();
     
@@ -154,35 +121,47 @@ class AdminUserService {
 
   /**
    * Deleta um usuário administrador.
-   * @param {number} currentUserId - O ID do usuário que está fazendo a alteração.
-   * @param {number} targetUserId - O ID do usuário a ser deletado.
-   * @returns {Promise<void>}
    */
   static async delete(currentUserId, targetUserId) {
-      if (Number(currentUserId) === Number(targetUserId)) {
-          throw new AppError('Você não pode excluir sua própria conta.', 403);
-      }
+    if (Number(currentUserId) === Number(targetUserId)) {
+        throw new AppError('Você não pode excluir sua própria conta.', 403);
+    }
 
-      const user = await AdminUser.findByPk(targetUserId);
-      if (!user) {
-        throw new AppError('Usuário administrador não encontrado.', 404);
-      }
+    const user = await AdminUser.findByPk(targetUserId);
+    if (!user) {
+      throw new AppError('Usuário administrador não encontrado.', 404);
+    }
 
-      if (user.role === 'superadmin') {
-        const superadminCount = await AdminUser.count({ where: { role: 'superadmin' } });
-        if (superadminCount <= 1) {
-          throw new AppError('Não é possível excluir o último superadministrador.', 403);
-        }
+    // Impede que o último admin seja deletado
+    if (user.role === 'admin') {
+      const adminCount = await AdminUser.count({ where: { role: 'admin' } });
+      if (adminCount <= 1) {
+        throw new AppError('Não é possível excluir o último administrador do sistema.', 403);
       }
+    }
 
-      await user.destroy();
+    await user.destroy();
   }
 
+  static async getAll() {
+    return AdminUser.findAll({
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
+    });
+  }
+
+  static async getById(id) {
+    const user = await AdminUser.findByPk(id, {
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
+    });
+    if (!user) {
+      throw new AppError('Usuário administrador não encontrado.', 404);
+    }
+    return user;
+  }
+  
   static async forgotPassword(email) {
     const user = await AdminUser.findOne({ where: { email } });
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     const passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
@@ -190,24 +169,11 @@ class AdminUserService {
 
     user.passwordResetToken = passwordResetToken;
     user.passwordResetExpires = passwordResetExpires;
-    await user.save({ fields: ['passwordResetToken', 'passwordResetExpires'] });
+    await user.save();
 
     const resetURL = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
-
-    const message = `Você solicitou a redefinição de senha. Por favor, acesse o link: ${resetURL}\n\nEste link é válido por 1 hora.`;
-
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Redefinição de Senha',
-        text: message,
-      });
-    } catch (err) {
-      user.passwordResetToken = null;
-      user.passwordResetExpires = null;
-      await user.save({ fields: ['passwordResetToken', 'passwordResetExpires'] });
-      throw new AppError('Houve um erro ao enviar o e-mail. Tente novamente.', 500);
-    }
+    const message = `Link para redefinição de senha: ${resetURL}`;
+    await sendEmail({ to: user.email, subject: 'Redefinição de Senha', text: message });
   }
 
   static async resetPassword(token, newPassword) {
