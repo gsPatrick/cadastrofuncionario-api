@@ -1,4 +1,4 @@
-
+// models/AdminUser.js
 
 module.exports = (sequelize, DataTypes) => {
   const AdminUser = sequelize.define('AdminUser', {
@@ -44,6 +44,23 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: true,
     },
+    // ==========================================================
+    // NOVO CAMPO ADICIONADO AQUI
+    // ==========================================================
+    role: {
+      type: DataTypes.ENUM('superadmin', 'admin'),
+      allowNull: false,
+      defaultValue: 'admin',
+      comment: 'Define o nível de permissão do usuário. "superadmin" pode gerenciar outros admins.'
+    },
+    passwordResetToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    passwordResetExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   }, {
     tableName: 'admin_users',
     timestamps: true,
@@ -53,7 +70,6 @@ module.exports = (sequelize, DataTypes) => {
     AdminUser.hasMany(models.Document, { foreignKey: 'uploadedById', as: 'uploadedDocuments' });
     AdminUser.hasMany(models.Annotation, { foreignKey: 'responsibleId', as: 'createdAnnotations' });
     AdminUser.hasMany(models.AnnotationHistory, { foreignKey: 'editedById', as: 'editedAnnotationHistories' });
-    // NOVA ASSOCIAÇÃO
     AdminUser.hasMany(models.EmployeeHistory, { foreignKey: 'changedById', as: 'employeeChanges' });
   };
 

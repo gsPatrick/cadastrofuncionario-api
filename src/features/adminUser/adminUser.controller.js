@@ -100,26 +100,68 @@ class AdminUserController {
    * @param {object} res - Objeto de resposta.
    * @param {function} next - Próxima função middleware.
    */
-  static async update(req, res, next) {
-    try {
-      // Para segurança, um admin não pode se desativar se for o único admin ativo
-      // Nem pode mudar seu próprio papel para algo que o impeça de gerenciar
-      // Estas são regras de negócio que podem ser implementadas no service ou aqui.
-      // Por enquanto, vamos permitir a atualização.
-      const updatedAdminUser = await AdminUserService.update(req.params.id, req.body);
-      res.status(200).json({
-        status: 'success',
-        data: {
-          adminUser: updatedAdminUser,
-        },
-      });
-    } catch (error) {
-      if (error.name === 'SequelizeUniqueConstraintError' || error.statusCode === 409) {
-        return next(new AppError(error.message, 409));
-      }
-      next(error);
+  static async update(currentUserId, targetUserId, updateData) {
+    const userToUpdate = await AdminUser.findByPk(targetUserId);
+    if (!userToUpdate) {
+      throw new AppError('Usuário administrador não encontrado.', 404);
     }
+
+    // Regra de negócio: Um usuário não pode alterar o próprio role ou status.
+    if (Number(currentUserId) === Number(targetUserId) && (updateData.role !== undefined || updateData.isActive !== undefined)) {
+        throw new AppError('Você não pode alterar seu próprio perfil ou status.', 403);
+    }
+
+    // Regra de negócio: Impedir que o último superadmin seja desativado ou rebaixado
+    if (updateData.role === 'admin' || updateData.isActive === false) {
+      if (userToUpdate.role === 'superadmin') {
+        const superadminCount = await AdminUser.count({ where: { role: 'superadmin', isActive: true } });
+        if (superadminCount <= 1) {
+          throw new AppError('Não é possível rebaixar ou desativar o último superadministrador.', 403);
+        }
+      }
+    }
+    
+    // Atualiza campos de dados
+    if (updateData.name) userToUpdate.name = enforceCase(updateData.name);
+    if (updateData.login) userToUpdate.login = enforceCase(updateData.login);
+    if (updateData.email) userToUpdate.email = updateData.email.toLowerCase();
+    
+    // Atualiza permissões
+    if (updateData.role) userToUpdate.role = updateData.role;
+    if (updateData.isActive !== undefined) userToUpdate.isActive = updateData.isActive;
+
+    if (updateData.password) {
+      userToUpdate.password = await hashPassword(updateData.password);
+    }
+    
+    await userToUpdate.save();
+    
+    const userResponse = userToUpdate.toJSON();
+    delete userResponse.password;
+    return userResponse;
   }
+  
+  static async delete(currentUserId, targetUserId) {
+    if (Number(currentUserId) === Number(targetUserId)) {
+        throw new AppError('Você não pode excluir sua própria conta.', 403);
+    }
+
+    const user = await AdminUser.findByPk(targetUserId);
+    if (!user) {
+      throw new AppError('Usuário administrador não encontrado.', 404);
+    }
+
+    // Regra de negócio: Impedir que um superadmin seja deletado se for o último
+    if (user.role === 'superadmin') {
+      const superadminCount = await AdminUser.count({ where: { role: 'superadmin' } });
+      if (superadminCount <= 1) {
+        throw new AppError('Não é possível excluir o último superadministrador.', 403);
+      }
+    }
+
+    await user.destroy();
+  }
+
 
   /**
    * Deleta um usuário administrador.
@@ -206,6 +248,56 @@ class AdminUserController {
     } catch (error) {
       next(error);
     }
+  }
+static async changePassword(req, res, next) {
+    try {
+      const userId = req.user.id; // ID do usuário logado a partir do token
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return next(new AppError('Senha atual e nova senha são obrigatórias.', 400));
+      }
+
+      await AdminUserService.changePassword(userId, currentPassword, newPassword);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Senha alterada com sucesso!',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+static async changePassword(userId, currentPassword, newPassword) {
+    const user = await AdminUser.findByPk(userId);
+    if (!user) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      throw new AppError('Senha atual incorreta.', 401);
+    }
+
+    user.password = await hashPassword(newPassword);
+    await user.save();
+  }
+
+  static async getAll() {
+    return AdminUser.findAll({
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
+    });
+  }
+
+  static async getById(id) {
+    const user = await AdminUser.findByPk(id, {
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires'] },
+    });
+    if (!user) {
+      throw new AppError('Usuário administrador não encontrado.', 404);
+    }
+    return user;
   }
 }
 
