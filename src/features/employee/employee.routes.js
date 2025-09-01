@@ -1,9 +1,11 @@
 const express = require('express');
 const EmployeeController = require('./employee.controller');
-const { authMiddleware, authorize } = require('../../utils/auth'); // authorize importado
+const { authMiddleware, authorize } = require('../../utils/auth');
 const { validateEmployeeCreation, validateEmployeeUpdate } = require('./employee.validator');
 const handleValidationErrors = require('../../utils/validationHandler');
-// ... outros imports
+const documentRouter = require('../document/document.routes');
+const annotationRouter = require('../annotation/annotation.routes');
+
 
 const router = express.Router();
 router.use(authMiddleware); // Aplica autenticação a todas as rotas
