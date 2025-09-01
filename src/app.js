@@ -71,9 +71,12 @@ async function createDefaultAdmin() {
         email: 'admin@admin.com',
         isActive: true,
         // ==========================================================
-        // CORREÇÃO APLICADA AQUI: Garante que o admin padrão seja superadmin
+        // CORREÇÃO APLICADA AQUI
+        // O perfil de super administrador agora é 'admin'. O perfil 'rh'
+        // é para usuários com permissões granulares.
         // ==========================================================
-        role: 'superadmin', 
+        role: 'admin',
+        permissions: null // Admins não possuem permissões granulares, o acesso é total.
       });
       console.log('Usuário administrador padrão criado com sucesso:', newAdmin.toJSON());
     } else {
@@ -83,7 +86,6 @@ async function createDefaultAdmin() {
     console.error('Falha ao tentar criar o usuário administrador padrão:', error);
   }
 }
-
 // Conectar ao banco de dados e iniciar o servidor
 async function startServer() {
   try {
