@@ -2,12 +2,12 @@
 const express = require('express');
 const DocumentController = require('./document.controller');
 const uploadMiddleware = require('../../utils/fileUpload');
-const { authMiddleware, authorizeAdmin } = require('../../utils/auth');
+const { authMiddleware, authorize } = require('../../utils/auth');
 
 const router = express.Router({ mergeParams: true });
 
 // Aplica autenticação a todas as rotas de documentos
-router.use(authMiddleware, authorizeAdmin);
+router.use(authMiddleware, authorize);
 
 // Rotas para documentos
 router.route('/')

@@ -2,13 +2,13 @@
 
 const express = require('express');
 const SettingsController = require('./settings.controller');
-const { authMiddleware, authorizeAdmin } = require('../../utils/auth');
+const { authMiddleware, authorize } = require('../../utils/auth');
 
 const router = express.Router();
 
 // Aplica middlewares de autenticação e autorização para todas as rotas de configurações
 router.use(authMiddleware);
-router.use(authorizeAdmin);
+router.use(authorize);
 
 // Rota para obter todas as configurações e para criar/atualizar uma nova
 router.route('/')

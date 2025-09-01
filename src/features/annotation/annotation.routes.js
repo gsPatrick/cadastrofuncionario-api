@@ -1,11 +1,11 @@
 // features/annotation/annotation.routes.js
 const express = require('express');
 const AnnotationController = require('./annotation.controller');
-const { authMiddleware, authorizeAdmin } = require('../../utils/auth'); // Import auth middleware
+const { authMiddleware, authorize } = require('../../utils/auth'); // Import auth middleware
 const router = express.Router({ mergeParams: true });
 // Aplicar authMiddleware a todas as rotas neste router
 // Isso garante que req.user.id esteja disponível no controller.
-router.use(authMiddleware, authorizeAdmin);
+router.use(authMiddleware, authorize);
 router.route('/')
 .post(AnnotationController.createAnnotation)
 .get(AnnotationController.getAnnotations);

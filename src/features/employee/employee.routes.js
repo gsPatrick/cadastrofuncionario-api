@@ -1,6 +1,6 @@
 const express = require('express');
 const EmployeeController = require('./employee.controller');
-const { authMiddleware, authorizeAdmin } = require('../../utils/auth');
+const { authMiddleware, authorize } = require('../../utils/auth');
 const { validateEmployeeCreation, validateEmployeeUpdate } = require('./employee.validator');
 const handleValidationErrors = require('../../utils/validationHandler');
 const documentRouter = require('../document/document.routes');
@@ -9,7 +9,7 @@ const annotationRouter = require('../annotation/annotation.routes');
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(authorizeAdmin);
+router.use(authorize);
 
 router.get('/export/csv', EmployeeController.exportToCsv);
 router.get('/export/pdf', EmployeeController.exportToPdf);
