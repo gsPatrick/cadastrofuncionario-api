@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
     // MUDANÇA ESTRUTURAL APLICADA AQUI
     // ==========================================================
     role: {
-      type: DataTypes.ENUM('superadmin', 'rh'),
+      type: DataTypes.ENUM('admin', 'rh'),
       allowNull: false,
       defaultValue: 'rh',
       comment: 'Define o perfil base. "admin" tem acesso total, "rh" tem permissões granulares.'
