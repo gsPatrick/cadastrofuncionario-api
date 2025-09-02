@@ -1,5 +1,5 @@
-const { AdminUser, sequelize } = require('../../models'); // Importar sequelize para acesso a Op
-const { Op } = require('sequelize'); // A FORMA MAIS DIRETA DE IMPORTAR Op
+const { AdminUser } = require('../../models');
+const { Op } = require('sequelize');
 const { hashPassword, comparePassword, generateToken } = require('../../utils/auth');
 const { AppError } = require('../../utils/errorHandler');
 const { enforceCase } = require('../../utils/textFormatter');
@@ -17,10 +17,6 @@ class AdminUserService {
     const formattedName = enforceCase(name);
     const formattedEmail = email.toLowerCase();
 
-    // ==========================================================
-    // CORREÇÃO APLICADA AQUI
-    // Usando o 'Op' importado diretamente do Sequelize.
-    // ==========================================================
     const existingUser = await AdminUser.findOne({
       where: {
         [Op.or]: [{ login: formattedLogin }, { email: formattedEmail }],
@@ -94,12 +90,27 @@ class AdminUserService {
       throw new AppError('Usuário administrador não encontrado.', 404);
     }
 
-    if (Number(currentUserId) === Number(targetUserId)) {
-      throw new AppError('Você não pode alterar suas próprias permissões ou status.', 403);
-    }
-
     const { name, login, email, password, role, isActive, permissions } = updateData;
+    
+    // ==========================================================
+    // CORREÇÃO APLICADA AQUI
+    // Lógica de permissão refinada
+    // ==========================================================
+    const isEditingSelf = Number(currentUserId) === Number(targetUserId);
 
+    if (isEditingSelf) {
+      // Se estiver editando a si mesmo, proíbe a alteração de role, status ou permissões.
+      if (role !== undefined || isActive !== undefined || permissions !== undefined) {
+        throw new AppError('Você não pode alterar seu próprio perfil, status ou permissões.', 403);
+      }
+    } else {
+      // Se estiver editando outro usuário, permite alterar role, status e permissões.
+      if (role) userToUpdate.role = role;
+      if (isActive !== undefined) userToUpdate.isActive = isActive;
+      userToUpdate.permissions = role === 'rh' ? permissions : null;
+    }
+    
+    // Atualizações de dados pessoais são sempre permitidas (para si ou para outros).
     if (name) userToUpdate.name = enforceCase(name);
     if (login) userToUpdate.login = enforceCase(login);
     if (email) userToUpdate.email = email.toLowerCase();
@@ -107,11 +118,6 @@ class AdminUserService {
     if (password) {
       userToUpdate.password = await hashPassword(password);
     }
-
-    if (role) userToUpdate.role = role;
-    if (isActive !== undefined) userToUpdate.isActive = isActive;
-    
-    userToUpdate.permissions = role === 'rh' ? permissions : null;
     
     await userToUpdate.save();
     
