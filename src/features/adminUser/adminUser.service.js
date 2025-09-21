@@ -1,5 +1,7 @@
+// src/features/adminUser/adminUser.service.js
+
 const { AdminUser } = require('../../models');
-const { Op } = require('sequelize');
+const { Op } = require('sequelize'); // O 'Op' já está importado, o que é ótimo.
 const { hashPassword, comparePassword, generateToken } = require('../../utils/auth');
 const { AppError } = require('../../utils/errorHandler');
 const { enforceCase } = require('../../utils/textFormatter');
@@ -55,12 +57,23 @@ class AdminUserService {
   /**
    * Autentica um usuário e retorna seus dados, incluindo a role e permissões.
    */
-  static async login(login, password) {
+  // ==========================================================
+  // CORREÇÃO APLICADA AQUI
+  // O parâmetro foi renomeado para 'identifier' para maior clareza.
+  // A busca agora verifica tanto o campo 'login' quanto o 'email'.
+  // ==========================================================
+  static async login(identifier, password) {
+    // Normaliza o identificador para minúsculas para consistência na busca de e-mail
+    const formattedIdentifier = identifier.toLowerCase();
+
     const user = await AdminUser.findOne({
-  where: {
-    [Op.or]: [{ login: loginOrEmail }, { email: loginOrEmail }],
-  },
-});
+      where: {
+        [Op.or]: [
+          { login: formattedIdentifier },
+          { email: formattedIdentifier }
+        ],
+      },
+    });
 
     if (!user || !(await comparePassword(password, user.password))) {
       throw new AppError('Credenciais inválidas.', 401);
@@ -96,25 +109,18 @@ class AdminUserService {
 
     const { name, login, email, password, role, isActive, permissions } = updateData;
     
-    // ==========================================================
-    // CORREÇÃO APLICADA AQUI
-    // Lógica de permissão refinada
-    // ==========================================================
     const isEditingSelf = Number(currentUserId) === Number(targetUserId);
 
     if (isEditingSelf) {
-      // Se estiver editando a si mesmo, proíbe a alteração de role, status ou permissões.
       if (role !== undefined || isActive !== undefined || permissions !== undefined) {
         throw new AppError('Você não pode alterar seu próprio perfil, status ou permissões.', 403);
       }
     } else {
-      // Se estiver editando outro usuário, permite alterar role, status e permissões.
       if (role) userToUpdate.role = role;
       if (isActive !== undefined) userToUpdate.isActive = isActive;
       userToUpdate.permissions = role === 'rh' ? permissions : null;
     }
     
-    // Atualizações de dados pessoais são sempre permitidas (para si ou para outros).
     if (name) userToUpdate.name = enforceCase(name);
     if (login) userToUpdate.login = enforceCase(login);
     if (email) userToUpdate.email = email.toLowerCase();
