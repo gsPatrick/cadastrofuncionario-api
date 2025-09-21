@@ -56,7 +56,11 @@ class AdminUserService {
    * Autentica um usuário e retorna seus dados, incluindo a role e permissões.
    */
   static async login(login, password) {
-    const user = await AdminUser.findOne({ where: { login } });
+    const user = await AdminUser.findOne({
+  where: {
+    [Op.or]: [{ login: loginOrEmail }, { email: loginOrEmail }],
+  },
+});
 
     if (!user || !(await comparePassword(password, user.password))) {
       throw new AppError('Credenciais inválidas.', 401);
